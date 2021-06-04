@@ -25,11 +25,7 @@ private:
 
 int main() {
 
-<<<<<<< Updated upstream
     static constexpr size_t N = 1024;
-=======
-    static constexpr size_t N = 100000000;
->>>>>>> Stashed changes
 
     xpu::initialize(xpu::driver::cuda);
 
