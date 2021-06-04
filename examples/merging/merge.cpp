@@ -1,10 +1,35 @@
 #include "MergeKernel.h"
 
 #include <xpu/host.h>
+#include <chrono>
+
+
+
+
+class Timer{
+public:
+    Timer(){
+        start = std::chrono::high_resolution_clock::now();
+    }
+    ~Timer(){
+        auto end = std::chrono::high_resolution_clock::now();
+        auto dur = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+        double time = dur*0.000000001;
+        printf("%f s -> %f ns \n", time, (double)dur);
+    }
+private:
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
+};
+
+
 
 int main() {
 
+<<<<<<< Updated upstream
     static constexpr size_t N = 1024;
+=======
+    static constexpr size_t N = 100000000;
+>>>>>>> Stashed changes
 
     xpu::initialize(xpu::driver::cuda);
 
@@ -20,7 +45,10 @@ int main() {
     xpu::copy(a, xpu::host_to_device);
     xpu::copy(b, xpu::host_to_device);
 
-    xpu::run_kernel<GpuMerge>(xpu::grid::n_blocks(1), a.device(), a.size(), b.device(), b.size(), dst.device());
+    {
+        Timer timer;
+        xpu::run_kernel<GpuMerge>(xpu::grid::n_blocks(1), a.device(), a.size(), b.device(), b.size(), dst.device());
+    }
 
     xpu::copy(dst, xpu::device_to_host);
 

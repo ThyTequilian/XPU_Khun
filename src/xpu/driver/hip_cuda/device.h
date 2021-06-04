@@ -314,25 +314,31 @@ private:
         int mp_next = merge_path<MgpuBoundsLower>(data_shared, aCount, data_shared + aCount, bCount, diag_next, comp);
 
         // Compute the ranges of the sources in shared memory.
-        int a0tid = mp;
-        int a1tid = mp_next;
-        int b0tid = aCount + diag - mp;
-        int b1tid = aCount + diag_next - mp_next;
+        int aBegin = mp;
+        int aEnd = mp_next;
+        int bBegin = aCount + diag - mp;
+        int bEnd = aCount + diag_next - mp_next;
+
+        Key aKey = data_shared[aBegin];
+        Key bKey = data_shared[bBegin];
+
+        // int a0tid = mp;
+        // int a1tid = mp_next;
+        // int b0tid = aCount + diag - mp;
+        // int b1tid = aCount + diag_next - mp_next;
 
         // PRINT_T("merge path: a0 = %d, a1 = %d, b0 = %d, b1 = %d", a0tid, a1tid, b0tid, b1tid);
-
-        // Serial merge into register.
-        serial_merge(data_shared, a0tid, a1tid, b0tid, b1tid, results, comp);
-    }
-
-    template<typename Compare>
-    __device__ void serial_merge(const data_t* keys_shared, int aBegin,  int aEnd, int bBegin, int bEnd, data_t* results, Compare &&comp) {
-        data_t aKey = keys_shared[aBegin];
-        data_t bKey = keys_shared[bBegin];
-
-        constexpr bool range_check = true;
+        // Optional shorthand for the sorting class.
+        //
+        // Template arguments are the type of the key that is sorted,
+        // size of the gpu block (currently hard-coded at 64 threads)
+        // and the number of keys that are sorted by each thread with
+        // the underlying cub::BlockRadixSort implementation.
+        using SortT = xpu::block_sort<float,Key, 64, 4>;
 
         // PRINT_T("Merging from SMEM, a0 = %d, a1 = %d, b0 = %d, b1 = %d", aBegin, aEnd, bBegin, bEnd);
+
+        auto range_check = true;
 
         #pragma unroll
         for (int i = 0; i < ItemsPerThread && (bBegin < bEnd || aBegin < aEnd); ++i) {
@@ -351,9 +357,9 @@ private:
             // PRINT_T("aBegin = %d, bBegin = %d", aBegin, bBegin);
 
             if (p) {
-                aKey = keys_shared[++aBegin];
+                aKey = data_shared[++aBegin];
             } else {
-                bKey = keys_shared[++bBegin];
+                bKey = data_shared[++bBegin];
             }
         }
         __syncthreads();
