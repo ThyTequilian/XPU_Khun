@@ -72,6 +72,10 @@ public:
         std::merge(a, a + size_a, b, b + size_b, dst, comp);
     }
 
+    void seq_merge(const Key *a,  const Key *b, size_t size_a, size_t size_b, Key *dst) {
+        std::merge(a, a + size_a, b, b + size_b, dst, [](Key const& a, Key const& b){return a>=b;});
+    }
+
 };
 
 } // namespace xpu

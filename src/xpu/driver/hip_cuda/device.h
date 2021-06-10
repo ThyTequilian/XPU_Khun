@@ -17,6 +17,7 @@
 #endif
 
 #include <iostream>
+#include <fstream>
 
 #if 0
 #define PRINT_B(message, ...) if (xpu::thread_idx::x() == 0) printf("t 0: " message "\n", ##__VA_ARGS__)
@@ -233,7 +234,6 @@ private:
             out[i_out] = r_block[r_i];
         }
     }
-
 };
 
 template<typename Key, int BlockSize, int ItemsPerThread>
@@ -248,11 +248,40 @@ public:
 
     XPU_D block_merge(storage_t &storage) : storage(storage) {}
 
+    XPU_D void seq_merge(const data_t *block1, const data_t *block2, size_t block_size1, size_t block_size2, data_t *out) {
+        if (thread_idx::x() > 0) {
+            return;
+        }
+        printf("SeqMerge");
+
+        size_t i1 = 0;
+        size_t i2 = 0;
+        size_t i_out = 0;
+
+        while (i1 < block_size1 && i2 < block_size2) {
+            if (block1[i1] < block2[i2]) {
+                out[i_out] = block1[i1];
+                i1++;
+            } else {
+                out[i_out] = block2[i2];
+                i2++;
+            }
+            i_out++;
+        }
+
+        size_t r_i = (i1 < block_size1 ? i1 : i2);
+        size_t r_size = (i1 < block_size1 ? block_size1 : block_size2);
+        const data_t *r_block = (i1 < block_size1 ? block1 : block2);
+        for (; r_i < r_size; r_i++, i_out++) {
+            out[i_out] = r_block[r_i];
+        }
+    }
+
     template<typename Compare>
     XPU_D void merge(const data_t *a, size_t size_a, const data_t *b, size_t size_b, data_t *dst, Compare &&comp) {
 
         PRINT_B("Merging arrays of size %llu and %llu", size_a, size_b);
-
+        printf("BlockMerge");
         int diag_next = 0;
         int mp_next = merge_path<MgpuBoundsLower>(a, size_a, b, size_b, diag_next, comp);
         for (int diag = 0; diag < size_a + size_b; diag = diag_next) {
@@ -453,9 +482,7 @@ private:
         }
         if(sync) __syncthreads();
     }
-
-    /************************************************ KHUN END ********************************************************/
-};
+}; //xpu::block_merge
 
 } // namespace xpu
 

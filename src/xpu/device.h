@@ -97,6 +97,8 @@ public:
     template<typename Compare>
     XPU_D void merge(const Key *a, size_t size_a, const Key *b, size_t size_b, Key *dst, Compare &&);
 
+    XPU_D void seq_merge(const Key *block1, const Key *block2, size_t block_size1, size_t block_size2, Key *out);
+
 };
 
 } // namespace xpu

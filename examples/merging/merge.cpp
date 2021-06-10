@@ -44,22 +44,43 @@ private:
 };
 
 
+class timeToFile{
+public:
+    timeToFile() = default;
+    ~timeToFile() = default;
+    
+    void writeTime(int const& size, int const& blocks, int const& blocksize, float &time){
+        printf("%i        %fs        %i        %i\n", blocksize, time, size, blocks);
+        std::ofstream myfile;
+        myfile.open ("data_seq.csv", std::ios_base::app);
+        myfile << "\n" << blocksize << "," << size << "," << blocks << "," << time ;
+        myfile.close();
+    }
+};
 
 
 
-int doBenchmark(size_t const& N, int const& blocks, int const& blocksize, xpu::hd_buffer<float> &a, xpu::hd_buffer<float> &b, xpu::hd_buffer<float> &dst){
+
+
+int doBenchmark(size_t const& N, int const& blocks, xpu::hd_buffer<float> &a, xpu::hd_buffer<float> &b, xpu::hd_buffer<float> &dst){
     
     xpu::initialize(xpu::driver::cuda);
-
+    int prod = log10(N);
     for (size_t i = 0; i < N; i++) {
-        a.host()[i] = 2*i;
-        b.host()[i] = 2*i+1;
+        a.host()[i] = prod*i;
+        b.host()[i] = prod*i+1;
     }
 
     xpu::copy(a, xpu::host_to_device);
     xpu::copy(b, xpu::host_to_device);
-    Timer timer(N, blocks, blocksize);
-    xpu::run_kernel<GpuMerge>(xpu::grid::n_blocks(blocks), a.device(), a.size(), b.device(), b.size(), dst.device());
+    std::vector<float> time;
+    {
+        //Timer timer(N, blocks, blocksize);
+        xpu::run_kernel<GpuMerge>(xpu::grid::n_blocks(blocks), a.device(), a.size(), b.device(), b.size(), dst.device());
+        
+    }
+    
+
     // for(int i = 10; i<=2048; i*=10)
     // {
     //     Timer timer(N, i,blocksize);
@@ -76,6 +97,7 @@ int doBenchmark(size_t const& N, int const& blocks, int const& blocksize, xpu::h
     bool isSorted = true;
     for (size_t i = 1; i < dst.size(); i++) {
         isSorted &= (h[i-1] <= h[i]);
+        std::cout << h[i] << std::endl;
     }
 
     if(!isSorted){
@@ -100,64 +122,48 @@ int doBenchmark(size_t const& N, int const& blocks, int const& blocksize, xpu::h
 }
 
 
-
 int main() {
 
-    static constexpr size_t N0 = 1000;
-    static constexpr int blocksize = 1024;
-    static constexpr int blocks = 2000;
+    timeToFile ttf;
 
     xpu::initialize(xpu::driver::cuda);
 
-    xpu::hd_buffer<float> a0{N0};
-    xpu::hd_buffer<float> b0{N0};
-    xpu::hd_buffer<float> dst0{a0.size() + b0.size()};
+    static constexpr size_t N0 = 100;
+    static constexpr size_t N1 = 1000;
+    static constexpr size_t N2 = 10000;
+    static constexpr size_t N3 = 100000;
+    static constexpr size_t N4 = 1000000;
+    static constexpr size_t N5 = 10000000;
 
-    doBenchmark(N0,blocks,blocksize,a0,b0,dst0);
+    static constexpr int blocksize = 2000;
+    static constexpr int blocks = 1024;
 
+    auto dodo = [&](size_t const& N, bool warmUp){
+        xpu::hd_buffer<float> a0{N};
+        xpu::hd_buffer<float> b0{N};
+        xpu::hd_buffer<float> dst0{a0.size() + b0.size()};
 
-    // static constexpr size_t N1 = 1000;
+        auto ret = doBenchmark(N,blocks,a0,b0,dst0);
+        if(ret != 0){
+            std:: cout << "not sorted" << std::endl;
+        }
+        if(!warmUp){
+            auto time = xpu::get_timing<GpuMerge>();
+            ttf.writeTime(N,blocks, blocksize, time[time.size()-1]);
+        }
+        return;
+    };
 
-    // xpu::hd_buffer<float> a1{N1};
-    // xpu::hd_buffer<float> b1{N1};
-    // xpu::hd_buffer<float> dst1{a1.size() + b1.size()};
+    //WarmUp
+    dodo(N0,true);
 
-    // doBenchmark(N1,blocks,blocksize,a1,b1,dst1);
-
-
-    // static constexpr size_t N2 = 10000;
-
-    // xpu::initialize(xpu::driver::cuda);
-
-    // xpu::hd_buffer<float> a2{N2};
-    // xpu::hd_buffer<float> b2{N2};
-    // xpu::hd_buffer<float> dst2{a2.size() + b2.size()};
-
-    // doBenchmark(N2,blocks,blocksize,a2,b2,dst2);
-    
-
-
-    // static constexpr size_t N3 = 100000;
-
-    // xpu::initialize(xpu::driver::cuda);
-
-    // xpu::hd_buffer<float> a3{N3};
-    // xpu::hd_buffer<float> b3{N3};
-    // xpu::hd_buffer<float> dst3{a3.size() + b3.size()};
-
-    // doBenchmark(N3,blocks,blocksize,a3,b3,dst3);
-    
-
-
-    // static constexpr size_t N4 = 1000000;
-
-    // xpu::initialize(xpu::driver::cuda);
-
-    // xpu::hd_buffer<float> a4{N4};
-    // xpu::hd_buffer<float> b4{N4};
-    // xpu::hd_buffer<float> dst4{a4.size() + b4.size()};
-
-    // doBenchmark(N4,blocks,blocksize,a4,b4,dst4);
-    
+    //BenchMarks
+    dodo(N0,false);
+    dodo(N1,false);    
+    dodo(N2, false);
+    dodo(N3, false);
+    dodo(N4, false);
+    dodo(N5, false);
+        
     return 0;
 }
