@@ -50,10 +50,10 @@ public:
     ~timeToFile() = default;
     
     void writeTime(int const& size, int const& blocks, int const& blocksize, float &time){
-        printf("%i        %fs        %i        %i\n", blocksize, time, size, blocks);
+        printf("blck%i        %fms        %i        %i\n", blocksize, time, size, blocks);
         std::ofstream myfile;
-        myfile.open ("data_seq.csv", std::ios_base::app);
-        myfile << "\n" << blocksize << "," << size << "," << blocks << "," << time ;
+        myfile.open ("data.csv", std::ios_base::app);
+        myfile << "\nParallelMerge" << "," << size << "," << blocksize << "," << time ;
         myfile.close();
     }
 };
@@ -97,7 +97,7 @@ int doBenchmark(size_t const& N, int const& blocks, xpu::hd_buffer<float> &a, xp
     bool isSorted = true;
     for (size_t i = 1; i < dst.size(); i++) {
         isSorted &= (h[i-1] <= h[i]);
-        std::cout << h[i] << std::endl;
+        //std::cout << h[i] << std::endl;
     }
 
     if(!isSorted){
@@ -128,15 +128,15 @@ int main() {
 
     xpu::initialize(xpu::driver::cuda);
 
-    static constexpr size_t N0 = 100;
-    static constexpr size_t N1 = 1000;
-    static constexpr size_t N2 = 10000;
-    static constexpr size_t N3 = 100000;
-    static constexpr size_t N4 = 1000000;
-    static constexpr size_t N5 = 10000000;
+    static constexpr size_t N0 = 10;
+    static constexpr size_t N1 = 100;
+    static constexpr size_t N2 = 1000;
+    static constexpr size_t N3 = 10000;
+    static constexpr size_t N4 = 100000;
+    static constexpr size_t N5 = 1000000;
 
-    static constexpr int blocksize = 2000;
-    static constexpr int blocks = 1024;
+    static constexpr int blocksize = 64;
+    static constexpr int blocks = 2000;
 
     auto dodo = [&](size_t const& N, bool warmUp){
         xpu::hd_buffer<float> a0{N};
@@ -157,13 +157,15 @@ int main() {
     //WarmUp
     dodo(N0,true);
 
+    for(int i = 0; i<20; i++){
     //BenchMarks
-    dodo(N0,false);
-    dodo(N1,false);    
-    dodo(N2, false);
-    dodo(N3, false);
-    dodo(N4, false);
-    dodo(N5, false);
+        dodo(N0,false);
+        dodo(N1,false);    
+        dodo(N2, false);
+        dodo(N3, false);
+        dodo(N4, false);
+        dodo(N5, false);
+    }
         
     return 0;
 }

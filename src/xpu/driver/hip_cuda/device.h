@@ -248,11 +248,10 @@ public:
 
     XPU_D block_merge(storage_t &storage) : storage(storage) {}
 
-    XPU_D void seq_merge(const data_t *block1, const data_t *block2, size_t block_size1, size_t block_size2, data_t *out) {
+        XPU_D void seq_merge(const data_t *block1, const data_t *block2, size_t block_size1, size_t block_size2, data_t *out) {
         if (thread_idx::x() > 0) {
             return;
         }
-        printf("SeqMerge");
 
         size_t i1 = 0;
         size_t i2 = 0;
@@ -277,11 +276,11 @@ public:
         }
     }
 
+
     template<typename Compare>
     XPU_D void merge(const data_t *a, size_t size_a, const data_t *b, size_t size_b, data_t *dst, Compare &&comp) {
 
         PRINT_B("Merging arrays of size %llu and %llu", size_a, size_b);
-        printf("BlockMerge");
         int diag_next = 0;
         int mp_next = merge_path<MgpuBoundsLower>(a, size_a, b, size_b, diag_next, comp);
         for (int diag = 0; diag < size_a + size_b; diag = diag_next) {
@@ -343,31 +342,25 @@ private:
         int mp_next = merge_path<MgpuBoundsLower>(data_shared, aCount, data_shared + aCount, bCount, diag_next, comp);
 
         // Compute the ranges of the sources in shared memory.
-        int aBegin = mp;
-        int aEnd = mp_next;
-        int bBegin = aCount + diag - mp;
-        int bEnd = aCount + diag_next - mp_next;
-
-        Key aKey = data_shared[aBegin];
-        Key bKey = data_shared[bBegin];
-
-        // int a0tid = mp;
-        // int a1tid = mp_next;
-        // int b0tid = aCount + diag - mp;
-        // int b1tid = aCount + diag_next - mp_next;
+        int a0tid = mp;
+        int a1tid = mp_next;
+        int b0tid = aCount + diag - mp;
+        int b1tid = aCount + diag_next - mp_next;
 
         // PRINT_T("merge path: a0 = %d, a1 = %d, b0 = %d, b1 = %d", a0tid, a1tid, b0tid, b1tid);
-        // Optional shorthand for the sorting class.
-        //
-        // Template arguments are the type of the key that is sorted,
-        // size of the gpu block (currently hard-coded at 64 threads)
-        // and the number of keys that are sorted by each thread with
-        // the underlying cub::BlockRadixSort implementation.
-        using SortT = xpu::block_sort<float,Key, 64, 4>;
+
+        // Serial merge into register.
+        serial_merge(data_shared, a0tid, a1tid, b0tid, b1tid, results, comp);
+    }
+
+    template<typename Compare>
+    __device__ void serial_merge(const data_t* keys_shared, int aBegin,  int aEnd, int bBegin, int bEnd, data_t* results, Compare &&comp) {
+        data_t aKey = keys_shared[aBegin];
+        data_t bKey = keys_shared[bBegin];
+
+        constexpr bool range_check = true;
 
         // PRINT_T("Merging from SMEM, a0 = %d, a1 = %d, b0 = %d, b1 = %d", aBegin, aEnd, bBegin, bEnd);
-
-        auto range_check = true;
 
         #pragma unroll
         for (int i = 0; i < ItemsPerThread && (bBegin < bEnd || aBegin < aEnd); ++i) {
@@ -386,9 +379,9 @@ private:
             // PRINT_T("aBegin = %d, bBegin = %d", aBegin, bBegin);
 
             if (p) {
-                aKey = data_shared[++aBegin];
+                aKey = keys_shared[++aBegin];
             } else {
-                bKey = data_shared[++bBegin];
+                bKey = keys_shared[++bBegin];
             }
         }
         __syncthreads();
@@ -482,7 +475,9 @@ private:
         }
         if(sync) __syncthreads();
     }
-}; //xpu::block_merge
+
+    /************************************************ KHUN END ********************************************************/
+}; //block_merge
 
 } // namespace xpu
 

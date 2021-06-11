@@ -1,8 +1,7 @@
 #include "MergeKernel.h"
 
 XPU_IMAGE(MergeKernel);
-
-XPU_BLOCK_SIZE(GpuMerge, 2000);
+XPU_BLOCK_SIZE(GpuMerge, 64);
 
 using merge_t = xpu::block_merge<float, xpu::block_size<GpuMerge>{}, 4>;
 
